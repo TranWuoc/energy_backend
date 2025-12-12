@@ -1,68 +1,63 @@
+const mongoose = require("mongoose");
 const buildingService = require("../services/building.service");
 
-// Create a new building
+// POST /api/buildings
 async function createBuilding(req, res, next) {
-  try {
-    const building = await buildingService.createBuilding(req.body);
-    return res.status(201).json(building);
-  } catch (error) {
-    return next(error);
-  }
+      try {
+            const building = await buildingService.createBuilding(req.body);
+            return res.status(201).json(building);
+      } catch (err) {
+            next(err);
+      }
 }
 
-// Get all building
+// GET /api/buildings
+async function getAllBuildings(req, res, next) {
+      try {
+            const buildings = await buildingService.listBuildings();
+            return res.json(buildings);
+      } catch (err) {
+            next(err);
+      }
+}
+
+// GET /api/buildings/:buildingId
 async function getBuildingById(req, res, next) {
-  try {
-    const building = await buildingService.listBuilding();
-    return res.json(building);
-  } catch (error) {
-    return next(error);
-  }
+      try {
+            const { buildingId } = req.params;
+            const building = await buildingService.getBuildingDetail(buildingId);
+            return res.json(building);
+      } catch (err) {
+            next(err);
+      }
 }
 
-// Get building by ID
-async function getBuilding(req, res, next) {
-  try {
-    const result = await buildingService.getBuildingById(req.params.buildingId);
-    if (!result) {
-      return res.status(404).json({ message: "Building not found" });
-    }
-    return res.json(result);
-  } catch (error) {
-    return next(error);
-  }
-}
-
-// Update building by ID
+// Update PUT /api/buildings/:buildingId
 async function updateBuilding(req, res, next) {
-  try {
-    const updatedBuilding = await buildingService.updateBuilding(req.params.buildingId, req.body);
-    if (!updatedBuilding) {
-      return res.status(404).json({ message: "Building not found" });
-    }
-    return res.json(updatedBuilding);
-  } catch (error) {
-    return next(error);
-  }
+      try {
+            const { buildingId } = req.params;
+            const updated = await buildingService.updateBuilding(buildingId, req.body);
+            return res.json(updated);
+      } catch (err) {
+            next(err);
+      }
 }
 
-// Delete building by ID
+// DELETE /api/buildings/:buildingId
 async function deleteBuilding(req, res, next) {
-  try {
-    const deleted = await buildingService.deleteBuilding(req.params.buildingId);
-    if (!deleted) {
-      return res.status(404).json({ message: "Building not found" });
-    }
-    return res.status(204).end();
-  } catch (error) {
-    return next(error);
-  }
+      try {
+            const { buildingId } = req.params;
+            const result = await buildingService.removeBuilding(buildingId);
+            return res.json(result);
+      } catch (err) {
+            next(err);
+      }
 }
 
 module.exports = {
-  createBuilding,
-  getBuildingById,
-  getBuilding,
-  updateBuilding,
-  deleteBuilding
+      createBuilding,
+      getBuildingById,
+      getAllBuildings,
+      updateBuilding,
+      deleteBuilding
 };

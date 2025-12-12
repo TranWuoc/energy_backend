@@ -1,18 +1,25 @@
 function errorHandler(err, req, res, next) {
-  console.error('[Error]', err);
+      console.error("[Error]", err);
 
-  // Lỗi validate của Mongoose
-  if (err.name === 'ValidationError') {
-    return res.status(400).json({
-      message: 'Validation error',
-      details: err.message
-    });
-  }
+      // Lỗi validate của Mongoose
+      if (err.name === "ValidationError") {
+            return res.status(400).json({
+                  message: "Validation error",
+                  details: err.message
+            });
+      }
 
-  return res.status(500).json({
-    message: 'Internal server error',
-    error: err.message
-  });
+      if (err.statusCode) {
+            return res.status(err.statusCode).json({
+                  message: err.message,
+                  details: err.details || null
+            });
+      }
+
+      return res.status(500).json({
+            message: "Internal server error",
+            error: err.message
+      });
 }
 
-module.exports = errorHandler;  
+module.exports = errorHandler;

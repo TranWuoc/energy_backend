@@ -189,6 +189,8 @@ const RenewableProductionSchema = new mongoose.Schema(
 );
 
 const BuildingSchema = new mongoose.Schema({
+      buildingId: { type: String, required: true, unique: true },
+
       generalInfo: { type: BuildingGeneralInfoSchema, required: true },
       operation: BuildingOperationSchema,
 

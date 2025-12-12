@@ -1,28 +1,103 @@
+// src/services/building.service.js
 const buildingRepo = require("../repositories/building.repository");
+const { generateBuildingId } = require("../utils/buildingId");
+const mongoose = require("mongoose");
 
 async function createBuilding(payload) {
-      const type = payload?.generalInfo?.buildingType;
+      try {
+            const buildingId = await generateBuildingId();
 
-      if (type === 1) {
-            if (payload.operation?.commercialOfficeZones?.lenghth) {
-                  throw new Error(
-                        "Toà nhà loại 1 (Văn phòng công sở nhà nước) không được khai báo commercialOfficeZones"
-                  );
+            const building = await buildingRepo.createBuilding({
+                  ...payload,
+                  buildingId
+            });
+
+            return building;
+      } catch (err) {
+            // Duplicate key error (Mongo)
+            if (err.code === 11000 && err.keyPattern?.buildingId) {
+                  throw {
+                        statusCode: 400,
+                        message: "Mã buildingId đã tồn tại, vui lòng thử lại"
+                  };
             }
+            throw err;
+      }
+}
+
+async function listBuildings() {
+      return buildingRepo.getAllBuildings();
+}
+
+async function getBuildingDetail(id) {
+      if (!mongoose.isValidObjectId(id)) {
+            throw {
+                  statusCode: 400,
+                  message: "ID không hợp lệ"
+            };
       }
 
-      if (type === 2) {
-            if (!payload.operation?.governmentOfficeZones?.lenghth) {
-                  throw new Error(
-                        "Toà nhà loại 2 (Văn phòng thương mại) không được khai báo governmentOfficeZones"
-                  );
-            }
+      const building = await buildingRepo.getBuildingById(id);
+      if (!building) {
+            throw {
+                  statusCode: 404,
+                  message: "Không tìm thấy tòa nhà"
+            };
       }
 
-      const building = await buildingRepo.createBuilding(payload);
       return building;
 }
 
+async function updateBuilding(id, payload) {
+      if (!mongoose.isValidObjectId(id)) {
+            throw {
+                  statusCode: 400,
+                  message: "ID không hợp lệ"
+            };
+      }
+
+      try {
+            const updated = await buildingRepo.updateBuilding(id, payload);
+
+            if (!updated) {
+                  throw {
+                        statusCode: 404,
+                        message: "Không tìm thấy tòa nhà"
+                  };
+            }
+
+            return updated;
+      } catch (err) {
+            if (err.name === "ValidationError") {
+                  throw err;
+            }
+            throw err;
+      }
+}
+
+async function removeBuilding(id) {
+      if (!mongoose.isValidObjectId(id)) {
+            throw {
+                  statusCode: 400,
+                  message: "ID không hợp lệ"
+            };
+      }
+
+      const deleted = await buildingRepo.deleteBuilding(id);
+      if (!deleted) {
+            throw {
+                  statusCode: 404,
+                  message: "Không tìm thấy tòa nhà"
+            };
+      }
+
+      return { message: "Xóa tòa nhà thành công" };
+}
+
 module.exports = {
-      createBuilding
+      createBuilding,
+      listBuildings,
+      getBuildingDetail,
+      updateBuilding,
+      removeBuilding
 };
