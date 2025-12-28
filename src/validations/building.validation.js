@@ -5,6 +5,55 @@ const timeRangeSchema = Joi.object({
       to: Joi.string().allow(null, "").optional()
 });
 
+const electricityConsumptionSchema = Joi.object({
+      year: Joi.number().integer().min(2000).max(2100).required(),
+      month: Joi.number().integer().min(1).max(12).required(),
+      energyConsumption: Joi.number().min(0).required(),
+      dataSource: Joi.number().valid(1, 2).required()
+});
+
+const consumedElectricitySchema = Joi.array()
+      .items(electricityConsumptionSchema)
+      .min(12)
+      .custom((value, helpers) => {
+            // Group theo năm
+            const grouped = {};
+            value.forEach((entry) => {
+                  const year = entry.year;
+                  if (!grouped[year]) grouped[year] = [];
+                  grouped[year].push(entry.month);
+            });
+
+            // Kiểm tra mỗi năm phải có đủ 12 tháng
+            for (const year in grouped) {
+                  const months = grouped[year];
+
+                  if (months.length !== 12) {
+                        return helpers.error("any.custom", {
+                              message: `Year ${year} must have exactly 12 months of data`
+                        });
+                  }
+
+                  // Kiểm tra không trùng tháng và đủ từ 1-12
+                  const monthSet = new Set(months);
+                  if (monthSet.size !== 12) {
+                        return helpers.error("any.custom", {
+                              message: `Year ${year} has duplicate months`
+                        });
+                  }
+
+                  for (let m = 1; m <= 12; m++) {
+                        if (!monthSet.has(m)) {
+                              return helpers.error("any.custom", {
+                                    message: `Year ${year} is missing month ${m}`
+                              });
+                        }
+                  }
+            }
+
+            return value;
+      }, "Validate yearly consumption");
+
 const systemZoneSchema = Joi.object({
       zoneCode: Joi.string().required(),
       hvac: timeRangeSchema.optional(),
@@ -45,7 +94,7 @@ const generalInfoSchema = Joi.object({
 
 const spaceZoneSchema = Joi.object({
       zoneCode: Joi.string()
-            .valid("admin", "meeting", "lobby", "corridor_wc", "security", "other")
+            .valid("administration", "meeting", "lobby", "corridor_wc", "security", "other")
             .required(),
       weekday: timeRangeSchema.optional(),
       saturday: timeRangeSchema.optional(),
@@ -59,11 +108,15 @@ const operationSchema = Joi.object({
       spaceZones: Joi.array().items(spaceZoneSchema).optional()
 });
 
-const consumptionItemSchema = Joi.object({
-      year: Joi.number().integer().required(),
+const monthlyConsumptionSchema = Joi.object({
       month: Joi.number().integer().min(1).max(12).required(),
-      energyConsumption: Joi.number().min(0).required(),
-      dataSource: Joi.number().valid(1, 2).required()
+      energyConsumption: Joi.number().min(0).required()
+});
+
+const yearlyConsumptionSchema = Joi.object({
+      year: Joi.number().integer().required(),
+      dataSource: Joi.number().valid(1, 2).required(),
+      monthlyData: Joi.array().items(monthlyConsumptionSchema).length(12).required()
 });
 
 const solarSchema = Joi.object({
@@ -101,15 +154,15 @@ const renewableItemSchema = Joi.object({
 
 const createBuildingSchema = Joi.object({
       generalInfo: generalInfoSchema.required(),
-      operation: operationSchema.optional(),
-      consumedElectricity: Joi.array().items(consumptionItemSchema).optional(),
-      producedElectricity: Joi.array().items(renewableItemSchema).optional()
+      operation: operationSchema.optional().required(),
+      consumedElectricity: consumedElectricitySchema.required(),
+      producedElectricity: Joi.array().items(renewableItemSchema).optional().required()
 });
 
 const updateBuildingSchema = Joi.object({
       generalInfo: generalInfoSchema.optional(),
       operation: operationSchema.optional(),
-      consumedElectricity: Joi.array().items(consumptionItemSchema).optional(),
+      consumedElectricity: consumedElectricitySchema.required(),
       producedElectricity: Joi.array().items(renewableItemSchema).optional()
 });
 

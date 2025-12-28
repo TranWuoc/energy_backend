@@ -32,6 +32,16 @@ async function getBuildingById(req, res, next) {
       }
 }
 
+async function getDetailBuilding(req, res, next) {
+      try {
+            const { buildingId } = req.params;
+            const building = await buildingService.getBuildingDetail(buildingId);
+            return res.json(building);
+      } catch (err) {
+            next(err);
+      }
+}
+
 // Update PUT /api/buildings/:buildingId
 async function updateBuilding(req, res, next) {
       try {
@@ -57,6 +67,7 @@ async function deleteBuilding(req, res, next) {
 module.exports = {
       createBuilding,
       getBuildingById,
+      getDetailBuilding,
       getAllBuildings,
       updateBuilding,
       deleteBuilding

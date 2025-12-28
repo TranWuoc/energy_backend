@@ -9,22 +9,25 @@ async function getAllBuildings() {
       return Building.find().lean();
 }
 
-async function getBuildingById(id) {
-      return Building.findById(id).lean();
+async function getDetailBuilding(buildingId) {
+      return Building.findOne({ buildingId }).lean();
 }
 
-async function updateBuilding(id, data) {
-      return Building.findByIdAndUpdate(id, data, { new: true, runValidators: true }).lean();
+async function updateBuilding(buildingId, data) {
+      return Building.findOneAndUpdate({ buildingId }, data, {
+            new: true,
+            runValidators: true
+      }).lean();
 }
 
-async function deleteBuilding(id) {
-      return Building.findByIdAndDelete(id).lean();
+async function deleteBuilding(buildingId) {
+      return Building.findOneAndDelete({ buildingId }).lean();
 }
 
 module.exports = {
       createBuilding,
       getAllBuildings,
-      getBuildingById,
+      getDetailBuilding,
       updateBuilding,
       deleteBuilding
 };

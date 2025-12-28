@@ -2,7 +2,7 @@ const express = require("express");
 const router = express.Router();
 
 const buildingController = require("../controllers/building.controller");
-const validateRequest = require("../middleware/validateRequest");
+const validateRequest = require("../middlewares/validateRequest");
 const {
       createBuildingSchema,
       updateBuildingSchema
@@ -14,13 +14,17 @@ router.post("/", validateRequest(createBuildingSchema), buildingController.creat
 // Lấy danh sách
 router.get("/", buildingController.getAllBuildings);
 
-// Lấy chi tiết theo id
-router.get("/buildingId", buildingController.getBuildingById);
+// Lấy chi tiết theo building
+router.get("/:buildingId", buildingController.getDetailBuilding);
 
 // Cập nhật
-router.put("/buildingId", validateRequest(updateBuildingSchema), buildingController.updateBuilding);
+router.put(
+      "/:buildingId",
+      validateRequest(updateBuildingSchema),
+      buildingController.updateBuilding
+);
 
 // Xoá
-router.delete("/buildingId", buildingController.deleteBuilding);
+router.delete("/:buildingId", buildingController.deleteBuilding);
 
 module.exports = router;

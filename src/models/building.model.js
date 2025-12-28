@@ -1,28 +1,15 @@
 const mongoose = require("mongoose");
+const { BUILDING_TYPE } = require("../constant/buildingTypes");
 
-const BUILDING_TYPE_MAP = {
-      1: "Văn phòng công sở nhà nước",
-      2: "Văn phòng thương mại"
-};
+const SPACE_ZONE_CODES = ["administration", "meeting", "lobby", "corridor_wc", "security", "other"];
 
-const ELECTRIC_DATA_SOURCES_MAP = {
-      1: "Hoá đơn điện hàng tháng",
-      2: "Công tơ điện / báo cáo kiểm toán"
-};
-
-const SPACE_ZONE_CODES = [
-      "administration",
-      "meeting",
-      "looby",
-      "corridor_wc",
-      "security",
-      "orther"
-];
-
+// Time range used to describe operation schedule of a system/zone.
+// Recommended format: "HH:mm" (24h).
+// Optional because many buildings do not have complete schedules at data-entry time.
 const TimeRangeSchema = new mongoose.Schema(
       {
-            startTime: { type: String, required: true },
-            endTime: { type: String, required: true }
+            from: { type: String, default: null },
+            to: { type: String, default: null }
       },
       { _id: false }
 );
@@ -32,12 +19,12 @@ const GovernmentOfficeZoneOperationSchema = new mongoose.Schema(
             zoneCode: {
                   type: String,
                   required: true,
-                  enum: ["administration", "meeting", "looby", "corridor_wc", "security"]
+                  enum: ["administration", "meeting", "lobby", "corridor_wc", "security"]
             },
-            hvac: TimeRangeSchema,
-            lighting: TimeRangeSchema,
-            waterHeating: TimeRangeSchema,
-            camera: TimeRangeSchema
+            hvac: { type: TimeRangeSchema, default: {} },
+            lighting: { type: TimeRangeSchema, default: {} },
+            waterHeating: { type: TimeRangeSchema, default: {} },
+            camera: { type: TimeRangeSchema, default: {} }
       },
       { _id: false }
 );
@@ -58,10 +45,10 @@ const CommercialOfficeZoneOperationSchema = new mongoose.Schema(
                         "indoor_parking"
                   ]
             },
-            hvac: TimeRangeSchema,
-            lighting: TimeRangeSchema,
-            waterHeating: TimeRangeSchema,
-            camera: TimeRangeSchema
+            hvac: { type: TimeRangeSchema, default: {} },
+            lighting: { type: TimeRangeSchema, default: {} },
+            waterHeating: { type: TimeRangeSchema, default: {} },
+            camera: { type: TimeRangeSchema, default: {} }
       },
       { _id: false }
 );
@@ -70,56 +57,69 @@ const BuildingGeneralSchema = new mongoose.Schema(
       {
             name: { type: String, required: true },
             address: { type: String, required: true },
-            owner: { type: string },
+            owner: { type: String },
 
             buildingType: {
                   type: Number,
-                  require: true,
-                  enum: [1, 2]
+                  required: true,
+                  enum: BUILDING_TYPE
             },
 
-            commingYear: { type: Number },
+            // Year the building started operation (used for filtering / context, not in EP formula).
+            commissioningYear: { type: Number, min: 1900, max: 3000 },
 
-            hasHVAC: { type: string },
-            hasLinghting: { type: string },
-            hasWaterHeating: { type: string },
+            hasHVAC: { type: Boolean, default: false },
+            hasLighting: { type: Boolean, default: false },
+            hasWaterHeating: { type: Boolean, default: false },
             otherSystems: { type: String },
 
             setpointTemperature: { type: Number },
             setpointHumidity: { type: Number },
-            setpontLightingLevel: { type: Number },
+            setpointLightingLevel: { type: Number },
 
             governmentSystemZones: [GovernmentOfficeZoneOperationSchema],
             commercialOfficeZones: [CommercialOfficeZoneOperationSchema],
 
             controlSystemType: { type: String },
 
-            totalFloorArea: { type: Number, required: true },
+            // Benchmarking grouping (must be consistent for comparable entities)
+            climateZone: { type: String },
+
+            // Optional sub-areas used for EP normalization (G.2)
+            outdoorParkingArea: { type: Number, default: 0, min: 0 }, // CPA (outside building)
+            dataCenterArea: { type: Number, default: 0, min: 0 }, // DCA
+
+            totalFloorArea: { type: Number, required: true }, // GFA
             aboveGroundFloorArea: { type: Number, required: true },
-            basmentFloorArea: { type: Number, required: true },
-            indoorParkingArea: { type: Number, required: true },
-            nonRentableArea: { type: Number, required: true },
-            totalRentableArea: { type: Number, required: true },
-            vacantArea: { type: Number, required: true }
+            basementFloorArea: { type: Number, required: true },
+
+            indoorParkingArea: { type: Number, default: 0, min: 0 },
+            nonRentableArea: { type: Number, default: 0, min: 0 },
+            totalRentableArea: { type: Number, default: 0, min: 0 },
+            vacantArea: { type: Number, default: 0, min: 0 }
       },
       { _id: false }
 );
 
-const SpaceZoneOperationSchema = new mongoose.Schema({
-      zoneCode: {
-            type: String,
-            required: true,
-            enum: SPACE_ZONE_CODES
+const SpaceZoneOperationSchema = new mongoose.Schema(
+      {
+            zoneCode: {
+                  type: String,
+                  required: true,
+                  enum: SPACE_ZONE_CODES
+            },
+
+            // Space operation schedule (optional)
+            weekday: { type: TimeRangeSchema, default: {} },
+            saturday: { type: TimeRangeSchema, default: {} },
+            sunday: { type: TimeRangeSchema, default: {} },
+
+            utilisationLevel: { type: String, default: null }, // Mức độ sử dụng
+            averagePeople: { type: Number, default: 0, min: 0 }, // Số người trung bình
+            note: { type: String, default: null }
       },
-
-      weekDay: TimeRangeSchema,
-      saturday: TimeRangeSchema,
-      sunday: TimeRangeSchema,
-
-      utilisationLevel: { type: String }, // Mức độ sử dụng
-      averagePeople: { type: Number }, // Số người trung bình
-      note: { type: String }
-});
+      { _id: false }
+);
 
 const BuildingOperationSchema = new mongoose.Schema(
       {
@@ -127,6 +127,37 @@ const BuildingOperationSchema = new mongoose.Schema(
       },
       { _id: false }
 );
+
+function validateFullYearMonthlyEntries(entries) {
+      if (!entries || entries.length === 0) {
+            return true; // allow empty, change logic if needed
+      }
+
+      const grouped = {};
+
+      // Group months by year
+      entries.forEach((e) => {
+            const y = e.year;
+            if (!grouped[y]) grouped[y] = [];
+            grouped[y].push(e.month);
+      });
+
+      for (const year in grouped) {
+            const months = grouped[year];
+
+            // Must have exactly 12 entries
+            if (months.length !== 12) return false;
+
+            // Must have all months 1–12, no duplicates
+            const monthSet = new Set(months);
+            if (monthSet.size !== 12) return false;
+            for (let m = 1; m <= 12; m++) {
+                  if (!monthSet.has(m)) return false;
+            }
+      }
+
+      return true;
+}
 
 const ElectricityConsumptionSchema = new mongoose.Schema(
       {
@@ -191,42 +222,14 @@ const RenewableProductionSchema = new mongoose.Schema(
 const BuildingSchema = new mongoose.Schema({
       buildingId: { type: String, required: true, unique: true },
 
-      generalInfo: { type: BuildingGeneralInfoSchema, required: true },
-      operation: BuildingOperationSchema,
-
+      generalInfo: { type: BuildingGeneralSchema, required: true },
+      operation: { type: BuildingOperationSchema, default: {} },
       // Điện tiêu thụ (bắt buộc mỗi năm đủ 12 tháng)
       consumedElectricity: {
             type: [ElectricityConsumptionSchema],
             validate: {
                   validator: function (entries) {
-                        if (!entries || entries.length === 0) {
-                              return true; // cho phép rỗng, nếu muốn bắt buộc thì đổi logic
-                        }
-
-                        const grouped = {};
-
-                        // Gom tháng theo năm
-                        entries.forEach((e) => {
-                              const y = e.year;
-                              if (!grouped[y]) grouped[y] = [];
-                              grouped[y].push(e.month);
-                        });
-
-                        for (const year in grouped) {
-                              const months = grouped[year];
-
-                              // Phải có đúng 12 entry
-                              if (months.length !== 12) return false;
-
-                              // Phải đủ 1–12, không trùng
-                              const monthSet = new Set(months);
-                              if (monthSet.size !== 12) return false;
-                              for (let m = 1; m <= 12; m++) {
-                                    if (!monthSet.has(m)) return false;
-                              }
-                        }
-
-                        return true;
+                        return validateFullYearMonthlyEntries(entries);
                   },
                   message: "Mỗi năm trong năng lượng tiêu thụ phải bao gồm đầy đủ 12 tháng (1–12) và không được trùng tháng."
             }
@@ -241,5 +244,3 @@ const BuildingSchema = new mongoose.Schema({
 const Building = mongoose.model("Building", BuildingSchema);
 
 module.exports = Building;
-module.exports.BUILDING_TYPE_MAP = BUILDING_TYPE_MAP;
-module.exports.ELECTRICITY_DATA_SOURCE_MAP = ELECTRICITY_DATA_SOURCE_MAP;

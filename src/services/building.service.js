@@ -2,6 +2,10 @@
 const buildingRepo = require("../repositories/building.repository");
 const { generateBuildingId } = require("../utils/buildingId");
 const mongoose = require("mongoose");
+const epCalculator = require("../calculators/ep.calculator");
+
+// Version tag for business rules used in EP (helps auditing when rules change)
+const EP_RULE_VERSION = "EP_v1_vacantArea_over_GLA";
 
 async function createBuilding(payload) {
       try {
@@ -12,7 +16,61 @@ async function createBuilding(payload) {
                   buildingId
             });
 
-            return building;
+            // 2) Compute EP (derived data). Do NOT block building creation if EP cannot be computed yet.
+            //    EP depends on: consumedElectricity (12 months/year), areas (GFA/GLA), vacantArea, etc.
+            let energyPerformance = [];
+            let epSaved = false;
+
+            try {
+                  // If the building has enough data, compute EP for all available years.
+                  energyPerformance = epCalculator.computeEnergyPerformanceAllYears(building);
+
+                  // 3) Persist EP results into a separate collection.
+                  //    Using native collection to avoid adding new model files at this stage.
+                  const col = mongoose.connection.collection("energy_performances");
+                  const now = new Date();
+                  const buildingName = building.generalInfo?.name || null;
+
+                  const docs = energyPerformance.map((r) => ({
+                        buildingId: r.buildingId,
+                        buildingName: buildingName,
+                        year: r.year,
+                        ep: r.EP,
+                        inputs: r.inputs,
+                        normalised: r.normalised,
+                        ruleVersion: EP_RULE_VERSION,
+                        computedAt: now
+                  }));
+
+                  if (docs.length > 0) {
+                        const ops = docs.map((d) => ({
+                              updateOne: {
+                                    filter: {
+                                          buildingName: d.buildingName,
+                                          buildingId: d.buildingId,
+                                          year: d.year,
+                                          ruleVersion: d.ruleVersion
+                                    },
+                                    update: { $set: d },
+                                    upsert: true
+                              }
+                        }));
+
+                        await col.bulkWrite(ops, { ordered: false });
+                        epSaved = true;
+                  }
+            } catch (epErr) {
+                  energyPerformance = [];
+                  epSaved = false;
+            }
+
+            // 4) Return building + EP results
+            return {
+                  building,
+                  energyPerformance,
+                  epSaved,
+                  epRuleVersion: EP_RULE_VERSION
+            };
       } catch (err) {
             // Duplicate key error (Mongo)
             if (err.code === 11000 && err.keyPattern?.buildingId) {
@@ -29,15 +87,8 @@ async function listBuildings() {
       return buildingRepo.getAllBuildings();
 }
 
-async function getBuildingDetail(id) {
-      if (!mongoose.isValidObjectId(id)) {
-            throw {
-                  statusCode: 400,
-                  message: "ID không hợp lệ"
-            };
-      }
-
-      const building = await buildingRepo.getBuildingById(id);
+async function getBuildingDetail(buildingId) {
+      const building = await buildingRepo.getDetailBuilding(buildingId);
       if (!building) {
             throw {
                   statusCode: 404,
@@ -48,16 +99,9 @@ async function getBuildingDetail(id) {
       return building;
 }
 
-async function updateBuilding(id, payload) {
-      if (!mongoose.isValidObjectId(id)) {
-            throw {
-                  statusCode: 400,
-                  message: "ID không hợp lệ"
-            };
-      }
-
+async function updateBuilding(buildingId, payload) {
       try {
-            const updated = await buildingRepo.updateBuilding(id, payload);
+            const updated = await buildingRepo.updateBuilding(buildingId, payload);
 
             if (!updated) {
                   throw {
@@ -66,7 +110,7 @@ async function updateBuilding(id, payload) {
                   };
             }
 
-            return updated;
+            return { message: "Cập nhật tòa nhà thành công", ...updated };
       } catch (err) {
             if (err.name === "ValidationError") {
                   throw err;
@@ -75,15 +119,8 @@ async function updateBuilding(id, payload) {
       }
 }
 
-async function removeBuilding(id) {
-      if (!mongoose.isValidObjectId(id)) {
-            throw {
-                  statusCode: 400,
-                  message: "ID không hợp lệ"
-            };
-      }
-
-      const deleted = await buildingRepo.deleteBuilding(id);
+async function removeBuilding(buildingId) {
+      const deleted = await buildingRepo.deleteBuilding(buildingId);
       if (!deleted) {
             throw {
                   statusCode: 404,
