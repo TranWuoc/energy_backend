@@ -13,10 +13,9 @@ async function upsertMany(results = []) {
       await EnergyPerformance.bulkWrite(ops);
 
       const docs = await EnergyPerformance.find({ buildingId: results[0].buildingId })
-            .populate("buildingId", "generalInfo.name") // ✅ Lấy toàn bộ building document
+            .populate("buildingId", "generalInfo.name", "generalInfo.")
             .lean();
 
-      // ✅ Transform: Flatten buildingId object
       return docs.map((doc) => ({
             ...doc,
             buildingName: doc.buildingId?.generalInfo?.name || null,

@@ -30,10 +30,14 @@ async function createBuilding(payload) {
                   const col = mongoose.connection.collection("energy_performances");
                   const now = new Date();
                   const buildingName = building.generalInfo?.name || null;
+                  const buildingType = building.generalInfo?.buildingType || null;
+                  const climateZone = building.generalInfo?.climateZone || null;
 
                   const docs = energyPerformance.map((r) => ({
                         buildingId: r.buildingId,
-                        buildingName: buildingName,
+                        buildingName,
+                        buildingType,
+                        climateZone,
                         year: r.year,
                         ep: r.EP,
                         inputs: r.inputs,
@@ -46,7 +50,6 @@ async function createBuilding(payload) {
                         const ops = docs.map((d) => ({
                               updateOne: {
                                     filter: {
-                                          buildingName: d.buildingName,
                                           buildingId: d.buildingId,
                                           year: d.year,
                                           ruleVersion: d.ruleVersion
@@ -110,7 +113,61 @@ async function updateBuilding(buildingId, payload) {
                   };
             }
 
-            return { message: "Cập nhật tòa nhà thành công", ...updated };
+            let energyPerformance = [];
+            let epSaved = false;
+
+            try {
+                  // If the building has enough data, compute EP for all available years.
+                  energyPerformance = epCalculator.computeEnergyPerformanceAllYears(building);
+
+                  // 3) Persist EP results into a separate collection.
+                  //    Using native collection to avoid adding new model files at this stage.
+                  const col = mongoose.connection.collection("energy_performances");
+                  const now = new Date();
+                  const buildingName = building.generalInfo?.name || null;
+                  const buildingType = building.generalInfo?.buildingType || null;
+                  const climateZone = building.generalInfo?.climateZone || null;
+
+                  const docs = energyPerformance.map((r) => ({
+                        buildingId: r.buildingId,
+                        buildingName,
+                        buildingType,
+                        climateZone,
+                        year: r.year,
+                        ep: r.EP,
+                        inputs: r.inputs,
+                        normalised: r.normalised,
+                        ruleVersion: EP_RULE_VERSION,
+                        computedAt: now
+                  }));
+
+                  if (docs.length > 0) {
+                        const ops = docs.map((d) => ({
+                              updateOne: {
+                                    filter: {
+                                          buildingId: d.buildingId,
+                                          year: d.year,
+                                          ruleVersion: d.ruleVersion
+                                    },
+                                    update: { $set: d },
+                                    upsert: true
+                              }
+                        }));
+
+                        await col.bulkWrite(ops, { ordered: false });
+                        epSaved = true;
+                  }
+            } catch (epErr) {
+                  energyPerformance = [];
+                  epSaved = false;
+            }
+
+            return {
+                  building: updated,
+                  energyPerformance,
+                  epSaved,
+                  epRuleVersion: EP_RULE_VERSION
+            };
       } catch (err) {
             if (err.name === "ValidationError") {
                   throw err;
@@ -126,6 +183,12 @@ async function removeBuilding(buildingId) {
                   statusCode: 404,
                   message: "Không tìm thấy tòa nhà"
             };
+      }
+      try {
+            const col = mongoose.connection.collection("energy_performances");
+            await col.deleteMany({ buildingId });
+      } catch (e) {
+            console.error("Lỗi khi xóa dữ liệu EP liên quan:", e);
       }
 
       return { message: "Xóa tòa nhà thành công" };
