@@ -5,50 +5,52 @@ const timeRangeSchema = Joi.object({
       to: Joi.string().allow(null, "").optional()
 });
 
-const electricityConsumptionSchema = Joi.object({
-      year: Joi.number().integer().min(2000).max(2100).required(),
-      month: Joi.number().integer().min(1).max(12).required(),
-      energyConsumption: Joi.number().min(0).required(),
-      dataSource: Joi.number().valid(1, 2).required()
+const monthlyConsumptionSchema = Joi.object({
+      month: Joi.number().min(1).max(12).required(),
+      energyConsumption: Joi.number().min(0).required()
 });
 
-const consumedElectricitySchema = Joi.array()
-      .items(electricityConsumptionSchema)
-      .min(12)
-      .custom((value, helpers) => {
-            // Group theo năm
-            const grouped = {};
-            value.forEach((entry) => {
-                  const year = entry.year;
-                  if (!grouped[year]) grouped[year] = [];
-                  grouped[year].push(entry.month);
-            });
+const electricityConsumptionSchema = Joi.object({
+      year: Joi.number().required(),
+      dataSource: Joi.number().valid(1, 2).required(),
+      monthlyData: Joi.array()
+            .items(monthlyConsumptionSchema)
+            .length(12)
+            .custom((value, helpers) => {
+                  const months = value.map((item) => item.month);
+                  const uniqueMonths = new Set(months);
 
-            // Kiểm tra mỗi năm phải có đủ 12 tháng
-            for (const year in grouped) {
-                  const months = grouped[year];
-
-                  if (months.length !== 12) {
+                  if (uniqueMonths.size !== 12) {
                         return helpers.error("any.custom", {
-                              message: `Year ${year} must have exactly 12 months of data`
-                        });
-                  }
-
-                  // Kiểm tra không trùng tháng và đủ từ 1-12
-                  const monthSet = new Set(months);
-                  if (monthSet.size !== 12) {
-                        return helpers.error("any.custom", {
-                              message: `Year ${year} has duplicate months`
+                              message: "Phải có đủ 12 tháng khác nhau (1-12)"
                         });
                   }
 
                   for (let m = 1; m <= 12; m++) {
-                        if (!monthSet.has(m)) {
+                        if (!uniqueMonths.has(m)) {
                               return helpers.error("any.custom", {
-                                    message: `Year ${year} is missing month ${m}`
+                                    message: `Thiếu tháng ${m}`
                               });
                         }
                   }
+
+                  return value;
+            })
+            .required()
+});
+
+const consumedElectricitySchema = Joi.array()
+      .items(electricityConsumptionSchema)
+      .min(1)
+      .custom((value, helpers) => {
+            // Kiểm tra không có năm trùng lặp
+            const years = value.map((entry) => entry.year);
+            const uniqueYears = new Set(years);
+
+            if (uniqueYears.size !== years.length) {
+                  return helpers.error("any.custom", {
+                        message: "Không được có năm trùng lặp"
+                  });
             }
 
             return value;
@@ -108,17 +110,6 @@ const operationSchema = Joi.object({
       spaceZones: Joi.array().items(spaceZoneSchema).optional()
 });
 
-const monthlyConsumptionSchema = Joi.object({
-      month: Joi.number().integer().min(1).max(12).required(),
-      energyConsumption: Joi.number().min(0).required()
-});
-
-const yearlyConsumptionSchema = Joi.object({
-      year: Joi.number().integer().required(),
-      dataSource: Joi.number().valid(1, 2).required(),
-      monthlyData: Joi.array().items(monthlyConsumptionSchema).length(12).required()
-});
-
 const solarSchema = Joi.object({
       isSelected: Joi.boolean().optional(),
       installedArea: Joi.number().min(0).optional(),
@@ -154,7 +145,7 @@ const renewableItemSchema = Joi.object({
 
 const createBuildingSchema = Joi.object({
       generalInfo: generalInfoSchema.required(),
-      operation: operationSchema.optional().required(),
+      operation: operationSchema.optional(),
       consumedElectricity: consumedElectricitySchema.required(),
       producedElectricity: Joi.array().items(renewableItemSchema).optional().required()
 });

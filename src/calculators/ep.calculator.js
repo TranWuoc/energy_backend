@@ -24,9 +24,17 @@ function listYearsFromMonthly(entries = []) {
 function sumKwhForYear(entries = [], year) {
       if (!Array.isArray(entries)) return 0;
 
-      return entries
-            .filter((e) => e && e.year === year)
-            .reduce((sum, e) => sum + (Number(e.energyConsumption) || 0), 0);
+      const yearEntry = entries.find((e) => e && e.year === year);
+      if (!yearEntry || !Array.isArray(yearEntry.monthlyData)) return 0;
+      return yearEntry.monthlyData.reduce((sum, m) => {
+            return sum + (Number(m.energyConsumption) || 0);
+      }, 0);
+}
+
+function getDataSourceForYear(entries = [], year) {
+      if (!Array.isArray(entries)) return null;
+      const yearEntry = entries.find((e) => e && e.year === year);
+      return yearEntry?.dataSource || null;
 }
 
 function computeVacantRate(generalInfo) {
@@ -92,6 +100,7 @@ function validateEpInputsForYear(buildingDoc, year, opts = {}) {
       const tbec = sumKwhForYear(buildingDoc.consumedElectricity || [], year);
       const cpec = sumKwhForYear(buildingDoc.parkingElectricity || [], year);
       const dcec = sumKwhForYear(buildingDoc.dataCenterElectricity || [], year);
+      const dataSource = getDataSourceForYear(buildingDoc.consumedElectricity || [], year);
 
       if (!Number.isFinite(tbec) || tbec <= 0) {
             issues.push({ field: "consumedElectricity", message: `TBEC phải > 0 cho năm ${year}` });
@@ -136,7 +145,9 @@ function validateEpInputsForYear(buildingDoc, year, opts = {}) {
                   [EP_VARS.TBEC]: tbec,
                   [EP_VARS.CPEC]: cpec,
                   [EP_VARS.DCEC]: dcec,
-                  [EP_VARS.EEC]: tbec - cpec - dcec
+                  [EP_VARS.EEC]: tbec - cpec - dcec,
+
+                  dataSource
             }
       };
 }
@@ -177,7 +188,9 @@ function computeEnergyPerformanceForYear(buildingDoc, year, opts = {}) {
 
                   [EP_VARS.TBEC]: derived[EP_VARS.TBEC],
                   [EP_VARS.CPEC]: derived[EP_VARS.CPEC],
-                  [EP_VARS.DCEC]: derived[EP_VARS.DCEC]
+                  [EP_VARS.DCEC]: derived[EP_VARS.DCEC],
+
+                  dataSource: derived.dataSource
             },
 
             normalised: {
@@ -214,6 +227,7 @@ module.exports = {
       // helpers (để unit test)
       listYearsFromMonthly,
       sumKwhForYear,
+      getDataSourceForYear,
       computeVacantRate,
       computeEffectiveFloorArea,
       computeTimeFactor

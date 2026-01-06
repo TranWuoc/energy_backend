@@ -130,46 +130,58 @@ const BuildingOperationSchema = new mongoose.Schema(
 
 function validateFullYearMonthlyEntries(entries) {
       if (!entries || entries.length === 0) {
-            return true; // allow empty, change logic if needed
+            return true; // allow empty
       }
 
-      const grouped = {};
+      // Kiểm tra không có năm trùng lặp
+      const years = entries.map((e) => e.year);
+      const uniqueYears = new Set(years);
+      if (uniqueYears.size !== years.length) {
+            return false; // có năm trùng
+      }
 
-      // Group months by year
-      entries.forEach((e) => {
-            const y = e.year;
-            if (!grouped[y]) grouped[y] = [];
-            grouped[y].push(e.month);
-      });
+      // Kiểm tra mỗi năm phải có đủ 12 tháng
+      for (const entry of entries) {
+            const monthlyData = entry.monthlyData;
 
-      for (const year in grouped) {
-            const months = grouped[year];
+            // Phải có đúng 12 tháng
+            if (!monthlyData || monthlyData.length !== 12) {
+                  return false;
+            }
 
-            // Must have exactly 12 entries
-            if (months.length !== 12) return false;
+            // Kiểm tra đủ tháng 1-12, không trùng
+            const monthSet = new Set(monthlyData.map((m) => m.month));
+            if (monthSet.size !== 12) {
+                  return false;
+            }
 
-            // Must have all months 1–12, no duplicates
-            const monthSet = new Set(months);
-            if (monthSet.size !== 12) return false;
             for (let m = 1; m <= 12; m++) {
-                  if (!monthSet.has(m)) return false;
+                  if (!monthSet.has(m)) {
+                        return false;
+                  }
             }
       }
 
       return true;
 }
 
+const MonthlyConsumptionSchema = new mongoose.Schema(
+      {
+            month: { type: Number, required: true, min: 1, max: 12 },
+            energyConsumption: { type: Number, required: true, min: 0 }
+      },
+      { _id: false }
+);
+
 const ElectricityConsumptionSchema = new mongoose.Schema(
       {
             year: { type: Number, required: true },
-            month: { type: Number, required: true, min: 1, max: 12 },
-            energyConsumption: { type: Number, required: true, min: 0 }, // in kWh
-
             dataSource: {
                   type: Number,
                   required: true,
                   enum: [1, 2]
-            }
+            },
+            monthlyData: { type: [MonthlyConsumptionSchema] }
       },
       { _id: false }
 );
