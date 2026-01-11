@@ -5,7 +5,10 @@ const buildingService = require("../services/building.service");
 async function createBuilding(req, res, next) {
       try {
             const building = await buildingService.createBuilding(req.body);
-            return res.status(201).json(building);
+            return res.status(201).json({
+                  buildingId: building.building.buildingId,
+                  data: building
+            });
       } catch (err) {
             next(err);
       }
@@ -15,7 +18,10 @@ async function createBuilding(req, res, next) {
 async function getAllBuildings(req, res, next) {
       try {
             const buildings = await buildingService.listBuildings();
-            return res.json(buildings);
+            return res.json({
+                  total: buildings.length,
+                  data: buildings
+            });
       } catch (err) {
             next(err);
       }
