@@ -20,8 +20,8 @@ async function updateBuilding(buildingId, data) {
       }).lean();
 }
 
-async function deleteBuilding(buildingId) {
-      return Building.findOneAndDelete({ buildingId }).lean();
+async function deleteBuilding(buildingId, options = {}) {
+      return Building.findOneAndDelete({ buildingId }, options);
 }
 
 module.exports = {

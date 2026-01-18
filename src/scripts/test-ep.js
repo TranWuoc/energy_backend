@@ -3,7 +3,7 @@ require("dotenv").config();
 const mongoose = require("mongoose");
 
 const Building = require("../models/building.model"); // model mongoose
-const ep = require("../calculators/ep.calculator"); // calculator bạn đã tách
+const ep = require("../helper/ep.calculator");
 
 async function main() {
       await mongoose.connect(process.env.MONGO_URI);

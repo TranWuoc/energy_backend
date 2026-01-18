@@ -1,7 +1,6 @@
 const mongoose = require("mongoose");
 const buildingService = require("../services/building.service");
 
-// POST /api/buildings
 async function createBuilding(req, res, next) {
       try {
             const building = await buildingService.createBuilding(req.body);
@@ -14,7 +13,6 @@ async function createBuilding(req, res, next) {
       }
 }
 
-// GET /api/buildings
 async function getAllBuildings(req, res, next) {
       try {
             const buildings = await buildingService.listBuildings();
@@ -27,7 +25,6 @@ async function getAllBuildings(req, res, next) {
       }
 }
 
-// GET /api/buildings/:buildingId
 async function getBuildingById(req, res, next) {
       try {
             const { buildingId } = req.params;
@@ -48,7 +45,6 @@ async function getDetailBuilding(req, res, next) {
       }
 }
 
-// Update PUT /api/buildings/:buildingId
 async function updateBuilding(req, res, next) {
       try {
             const { buildingId } = req.params;
@@ -59,7 +55,6 @@ async function updateBuilding(req, res, next) {
       }
 }
 
-// DELETE /api/buildings/:buildingId
 async function deleteBuilding(req, res, next) {
       try {
             const { buildingId } = req.params;

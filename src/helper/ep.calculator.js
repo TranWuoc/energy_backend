@@ -1,9 +1,5 @@
-// src/calculators/ep.calculator.js
 const { EP_VARS, EP_DEFAULTS } = require("../constant/ep.constants");
 
-/**
- * Helpers
- */
 function clampNumber(v, fallback = 0) {
       const n = Number(v);
       return Number.isFinite(n) ? n : fallback;
@@ -31,6 +27,17 @@ function sumKwhForYear(entries = [], year) {
       }, 0);
 }
 
+function getAnnualKwhFromMonthlyAverage(arr = [], year) {
+      if (!Array.isArray(arr)) return 0;
+
+      const row = arr.find((x) => Number(x.year) === Number(year));
+      if (!row) return 0;
+
+      const monthlyAverageKwh = Number(row.monthlyAverageEnergyConsumption) || 0;
+
+      return monthlyAverageKwh * 12;
+}
+
 function getDataSourceForYear(entries = [], year) {
       if (!Array.isArray(entries)) return null;
       const yearEntry = entries.find((e) => e && e.year === year);
@@ -47,7 +54,6 @@ function computeVacantRate(generalInfo) {
 }
 
 function computeEffectiveFloorArea(generalInfo) {
-      // EFA = GFA - CPA - DCA - (GLA * FVR)
       const gfa = clampNumber(generalInfo?.totalFloorArea, 0); // GFA
       const cpa = ensureNonNegative(clampNumber(generalInfo?.outdoorParkingArea, 0)); // CPA
       const dca = ensureNonNegative(clampNumber(generalInfo?.dataCenterArea, 0)); // DCA
@@ -56,7 +62,6 @@ function computeEffectiveFloorArea(generalInfo) {
 
       return gfa - cpa - dca - gla * fvr;
 }
-// Time Factor TF = AWH / WOH (default 1 if missing)
 function computeTimeFactor(opts = {}) {
       const awh = clampNumber(opts.AWH, null);
       const woh = clampNumber(opts.WOH, null);
@@ -65,22 +70,15 @@ function computeTimeFactor(opts = {}) {
       return awh / woh;
 }
 
-/**
- * Validate EP inputs for a year and return derived values.
- * Returns: { ok, issues, derived }
- */
 function validateEpInputsForYear(buildingDoc, year, opts = {}) {
       const issues = [];
-      // General Info = gi
       const gi = buildingDoc?.generalInfo || {};
 
-      // Areas
       const gfa = clampNumber(gi.totalFloorArea, NaN);
       const cpa = ensureNonNegative(clampNumber(gi.outdoorParkingArea, 0));
       const dca = ensureNonNegative(clampNumber(gi.dataCenterArea, 0));
       const gla = ensureNonNegative(clampNumber(gi.totalRentableArea, 0));
 
-      // Vacancy
       const fvr = computeVacantRate(gi);
 
       if (!Number.isFinite(gfa) || gfa <= 0) {
@@ -96,10 +94,13 @@ function validateEpInputsForYear(buildingDoc, year, opts = {}) {
             });
       }
 
-      // Electricity
       const tbec = sumKwhForYear(buildingDoc.consumedElectricity || [], year);
-      const cpec = sumKwhForYear(buildingDoc.parkingElectricity || [], year);
-      const dcec = sumKwhForYear(buildingDoc.dataCenterElectricity || [], year);
+      const cpec = getAnnualKwhFromMonthlyAverage(buildingDoc.parkingAnnualElectricity || [], year);
+
+      const dcec = getAnnualKwhFromMonthlyAverage(
+            buildingDoc.dataCenterAnnualElectricity || [],
+            year
+      );
       const dataSource = getDataSourceForYear(buildingDoc.consumedElectricity || [], year);
 
       if (!Number.isFinite(tbec) || tbec <= 0) {
@@ -112,7 +113,6 @@ function validateEpInputsForYear(buildingDoc, year, opts = {}) {
             });
       }
 
-      // Optional hours
       const awh = opts.AWH != null ? Number(opts.AWH) : null;
       const woh = opts.WOH != null ? Number(opts.WOH) : null;
       if (awh != null && (!Number.isFinite(awh) || awh <= 0)) {
@@ -122,7 +122,6 @@ function validateEpInputsForYear(buildingDoc, year, opts = {}) {
             issues.push({ field: "WOH", message: "WOH phải là số > 0" });
       }
 
-      // Cross-check EFA
       const efa = computeEffectiveFloorArea(gi);
       if (!Number.isFinite(efa) || efa <= 0) {
             issues.push({
@@ -152,10 +151,6 @@ function validateEpInputsForYear(buildingDoc, year, opts = {}) {
       };
 }
 
-/**
- * Compute EP for a single year.
- * Throws Error(statusCode=400, details=[...]) if invalid.
- */
 function computeEnergyPerformanceForYear(buildingDoc, year, opts = {}) {
       const gi = buildingDoc?.generalInfo || {};
 
@@ -170,7 +165,6 @@ function computeEnergyPerformanceForYear(buildingDoc, year, opts = {}) {
       const derived = validation.derived;
       const tf = computeTimeFactor(opts);
 
-      // EP = (EEC / EFA) * TF
       const ep = (derived[EP_VARS.EEC] / derived[EP_VARS.EFA]) * tf;
 
       return {
@@ -205,9 +199,6 @@ function computeEnergyPerformanceForYear(buildingDoc, year, opts = {}) {
       };
 }
 
-/**
- * Compute EP for all available years in consumedElectricity.
- */
 function computeEnergyPerformanceAllYears(buildingDoc, opts = {}) {
       const years = listYearsFromMonthly(buildingDoc?.consumedElectricity || []);
       if (years.length === 0) {
@@ -219,12 +210,9 @@ function computeEnergyPerformanceAllYears(buildingDoc, opts = {}) {
 }
 
 module.exports = {
-      // main APIs
       validateEpInputsForYear,
       computeEnergyPerformanceForYear,
       computeEnergyPerformanceAllYears,
-
-      // helpers (để unit test)
       listYearsFromMonthly,
       sumKwhForYear,
       getDataSourceForYear,

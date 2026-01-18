@@ -1,6 +1,5 @@
 const authService = require("../services/auth.service");
 
-// POST /api/auth/register
 async function register(req, res, next) {
       try {
             const result = await authService.register(req.body);
@@ -18,7 +17,6 @@ async function register(req, res, next) {
       }
 }
 
-// POST /api/auth/login
 async function login(req, res, next) {
       try {
             const { username, password } = req.body;
@@ -59,7 +57,6 @@ async function login(req, res, next) {
       }
 }
 
-// GET /api/auth/profile
 async function getProfile(req, res, next) {
       try {
             const admin = await authService.getProfile(req.admin.id);
@@ -73,7 +70,6 @@ async function getProfile(req, res, next) {
       }
 }
 
-// PUT /api/auth/change-password
 async function changePassword(req, res, next) {
       try {
             const { oldPassword, newPassword } = req.body;
@@ -102,12 +98,8 @@ async function changePassword(req, res, next) {
             next(err);
       }
 }
-
-// POST /api/auth/logout
 async function logout(req, res, next) {
       try {
-            // Với JWT stateless, logout chỉ cần FE xóa token
-            // Có thể implement blacklist token nếu cần
             return res.json({
                   success: true,
                   message: "Đăng xuất thành công"

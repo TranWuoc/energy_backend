@@ -11,7 +11,6 @@ async function getEnergyPerformanceList(req, res, next) {
 
             const results = await col.find(filter).sort({ buildingId: 1, year: -1 }).toArray();
 
-            // Kiểm tra nếu có filter nhưng không tìm thấy kết quả
             if (results.length === 0 && Object.keys(filter).length > 0) {
                   return res.status(404).json({
                         message: "No energy performance data found matching the specified criteria",

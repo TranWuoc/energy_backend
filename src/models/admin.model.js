@@ -45,7 +45,6 @@ const adminSchema = new mongoose.Schema(
       }
 );
 
-// Hash password trước khi lưu
 adminSchema.pre("save", async function () {
       if (!this.isModified("password")) return;
 
@@ -53,12 +52,10 @@ adminSchema.pre("save", async function () {
       this.password = await bcrypt.hash(this.password, salt);
 });
 
-// Method so sánh password
 adminSchema.methods.comparePassword = async function (candidatePassword) {
       return bcrypt.compare(candidatePassword, this.password);
 };
 
-// Ẩn password khi trả về JSON
 adminSchema.methods.toJSON = function () {
       const obj = this.toObject();
       delete obj.password;

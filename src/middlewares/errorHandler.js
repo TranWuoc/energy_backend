@@ -1,7 +1,6 @@
 function errorHandler(err, req, res, next) {
       console.error("[Error]", err);
 
-      // Lỗi validate của Mongoose
       if (err.name === "ValidationError") {
             return res.status(400).json({
                   message: "Validation error",
