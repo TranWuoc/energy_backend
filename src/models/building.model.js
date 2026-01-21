@@ -1,5 +1,5 @@
 const mongoose = require("mongoose");
-const { BUILDING_TYPE } = require("../constant/buildingTypes");
+const { BUILDING_TYPE, CONTROL_SYSTEM_TYPES } = require("../constant/buildingTypes");
 
 const GOV_ZONE_CODES = [
       "admin_work", // Khu làm việc hành chính
@@ -123,7 +123,11 @@ const BuildingGeneralSchema = new mongoose.Schema(
             governmentSystemZones: [GovernmentOfficeZoneOperationSchema],
             commercialOfficeZones: [CommercialOfficeZoneOperationSchema],
 
-            controlSystemType: { type: String },
+            controlSystemType: {
+                  type: String,
+                  enum: CONTROL_SYSTEM_TYPES,
+                  default: "Other"
+            },
 
             climateZone: { type: String },
 
